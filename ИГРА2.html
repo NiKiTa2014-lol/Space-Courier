@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Космический курьер — Финальная версия</title>
+  <style>
+    body { margin:0; overflow:hidden; font-family:'Segoe UI',Arial,sans-serif; background:#000; color:white; }
+    /* Главное меню */
+    #mainMenu {
+      position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:200;
+      display:flex; justify-content:center; align-items:center; flex-direction:column; backdrop-filter:blur(12px);
+      transition:0.3s;
+    }
+    #mainMenu h1 { font-size:64px; letter-spacing:10px; text-shadow:0 0 30px #ffaa33; margin-bottom:30px; font-family:'Courier New',monospace; }
+    #mainMenu button {
+      background:rgba(0,0,0,0.7); border:2px solid #ffaa44; color:#ffaa44; font-size:24px; padding:12px 30px;
+      margin:10px; border-radius:40px; cursor:pointer; font-family:'Courier New',monospace; transition:0.2s;
+      width:260px; backdrop-filter:blur(4px);
+    }
+    #mainMenu button:hover { background:#ffaa44; color:black; transform:scale(1.05); }
+    #difficultySelect { margin:20px 0; display:flex; gap:15px; }
+    .difficulty { background:#222; border:1px solid #ffaa44; color:#ffaa44; padding:5px 15px; border-radius:20px; cursor:pointer; font-size:16px; }
+    .difficulty.active { background:#ffaa44; color:black; }
+    #info {
+      position:absolute; top:20px; left:20px; background:rgba(0,0,0,0.75); padding:12px 20px; border-radius:12px;
+      backdrop-filter:blur(8px); z-index:10; pointer-events:none; font-family:'Courier New',monospace;
+      border-left:4px solid #ffaa44; box-shadow:0 0 15px rgba(0,0,0,0.5);
+    }
+    #info div { margin:5px 0; }
+    #healthBar {
+      width:200px; height:14px; background:#330000; border-radius:8px; overflow:hidden; margin-top:6px;
+      box-shadow: inset 0 0 4px rgba(0,0,0,0.5);
+    }
+    #healthFill { width:100%; height:100%; background:linear-gradient(90deg, #ff5555, #ff2222); transition:width 0.2s; }
+    #message {
+      position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.9); padding:20px 40px;
+      border-radius:20px; color:#ffaa44; font-size:28px; text-align:center; z-index:20; display:none;
+      font-family:'Courier New',monospace; backdrop-filter:blur(8px);
+    }
+    #subtitles {
+      position:absolute; bottom:40px; left:10%; right:10%; background:rgba(0,0,0,0.85); color:white;
+      font-family:'Press Start 2P', monospace; font-size:14px; text-align:center; padding:12px 16px;
+      border:2px solid #88aaff; border-radius:30px; z-index:15; transition:0.2s; pointer-events:none;
+      backdrop-filter:blur(8px); box-shadow:0 0 15px rgba(136,170,255,0.3);
+    }
+    .subtitle-hidden { opacity:0; visibility:hidden; }
+    .subtitle-visible { opacity:1; visibility:visible; }
+    #controlsHint {
+      position:absolute; bottom:20px; right:20px; background:rgba(0,0,0,0.65); padding:8px 14px; border-radius:30px;
+      font-size:12px; font-family:monospace; z-index:10; backdrop-filter:blur(4px);
+    }
+    #musicToggle {
+      position:absolute; bottom:20px; left:20px; background:rgba(0,0,0,0.7); border:1px solid #ffaa44; color:#ffaa44;
+      padding:5px 14px; border-radius:30px; cursor:pointer; z-index:15; font-family:monospace; font-size:12px;
+      backdrop-filter:blur(4px);
+    }
+    #cameraHint {
+      position:absolute; bottom:80px; right:20px; background:rgba(0,0,0,0.6); padding:4px 8px; border-radius:20px;
+      font-size:10px; font-family:monospace; z-index:10;
+    }
+    #achievementsPanel {
+      position:absolute; top:80px; right:20px; background:rgba(0,0,0,0.7); padding:8px 12px; border-radius:8px;
+      font-size:10px; font-family:monospace; max-width:180px; z-index:10; pointer-events:none;
+      backdrop-filter:blur(4px);
+    }
+    #relockScreen {
+      position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:200;
+      display:flex; justify-content:center; align-items:center; flex-direction:column; color:white; cursor:pointer;
+      backdrop-filter:blur(12px);
+    }
+    .hidden { display:none !important; }
+  </style>
+</head>
+<body>
+  <div id="mainMenu">
+    <h1>🚀 КОСМИЧЕСКИЙ КУРЬЕР</h1>
+    <div id="difficultySelect">
+      <div class="difficulty" data-diff="easy">ЛЁГКИЙ</div>
+      <div class="difficulty active" data-diff="normal">НОРМАЛЬНЫЙ</div>
+      <div class="difficulty" data-diff="hard">СЛОЖНЫЙ</div>
+    </div>
+    <button id="startBtn">СТАРТ</button>
+    <button id="exitBtn">ВЫХОД</button>
+    <p style="margin-top:30px; font-size:12px;">WASD / стрелки — движение | C — камера | Мышь — осмотр</p>
+  </div>
+  <div id="info" class="hidden">
+    <div>💥 ЗДОРОВЬЕ: <span id="healthValue">100</span></div>
+    <div id="healthBar"><div id="healthFill"></div></div>
+    <div>🏆 КАПСУЛЫ: <span id="capsules">0</span>/5</div>
+    <div>⚡ БОНУСЫ: <span id="bonusStatus">-</span></div>
+  </div>
+  <div id="subtitles" class="subtitle-hidden"></div>
+  <div id="message"></div>
+  <div id="achievementsPanel" class="hidden">🏅 ДОСТИЖЕНИЯ:<br><span id="achList">-</span></div>
+  <div id="controlsHint" class="hidden">🎮 WASD / стрелки — движение | C — камера | Мышь — осмотр</div>
+  <div id="cameraHint" class="hidden">🎥 Камера: вид сзади</div>
+  <div id="musicToggle" class="hidden">🎵 МУЗЫКА: ВКЛ</div>
+  <div id="relockScreen" class="hidden">
+    <p>🔒 Управление заблокировано</p>
+    <p>Нажмите, чтобы продолжить</p>
+  </div>
+
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.128.0/build/three.module.js", "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/" } }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+    // ---------- ИНИЦИАЛИЗАЦИЯ СЦЕНЫ ----------
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x010118);
+    scene.fog = new THREE.FogExp2(0x010118, 0.0004);
+    
+    const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.05, 600);
+    let cameraMode = 0;
+    camera.position.set(0, 3.5, -8);
+    
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.5;
+    document.body.appendChild(renderer.domElement);
+    
+    const controls = new PointerLockControls(camera, document.body);
+    let gameActive = false;
+    let difficulty = 'normal';
+    
+    // ---------- ЗВУК ----------
+    let audioCtx = null;
+    let musicInterval = null;
+    let musicOn = true;
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+    function playTone(freq, dur, vol=0.07) {
+      const ctx = initAudio();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.value = vol;
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + dur);
+    }
+    function startMusic() {
+      if (musicInterval) clearInterval(musicInterval);
+      musicInterval = setInterval(() => {
+        if (gameActive && musicOn) {
+          const notes = [262, 294, 330, 349, 392];
+          const note = notes[Math.floor(Math.random() * notes.length)];
+          playTone(note, 1.3, 0.02);
+        }
+      }, 3200);
+    }
+    function stopMusic() { if (musicInterval) clearInterval(musicInterval); musicInterval = null; }
+    
+    // ---------- АЛИСА ----------
+    let synth = window.speechSynthesis;
+    let aliceVoice = null;
+    let currentUtterance = null;
+    let subTimeout = null;
+    function loadAliceVoice() {
+      if (!synth) return;
+      const voices = synth.getVoices();
+      aliceVoice = voices.find(v => v.lang === 'ru-RU' && (v.name.includes('Alice') || v.name.includes('Алиса'))) ||
+                    voices.find(v => v.lang === 'ru-RU') || null;
+    }
+    if (synth) {
+      if (synth.getVoices().length) loadAliceVoice();
+      else synth.onvoiceschanged = loadAliceVoice;
+    }
+    function showSubtitle(text, duration) {
+      if (subTimeout) clearTimeout(subTimeout);
+      const subDiv = document.getElementById('subtitles');
+      subDiv.innerText = "🎙️ АЛИСА: " + text;
+      subDiv.classList.remove('subtitle-hidden');
+      subDiv.classList.add('subtitle-visible');
+      subTimeout = setTimeout(() => {
+        subDiv.classList.remove('subtitle-visible');
+        subDiv.classList.add('subtitle-hidden');
+      }, duration * 1000);
+    }
+    function speakAlice(text) {
+      if (!synth) { showSubtitle(text, 4); return; }
+      if (currentUtterance) synth.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'ru-RU';
+      utter.rate = 0.9;
+      utter.pitch = 1.15;
+      if (aliceVoice) utter.voice = aliceVoice;
+      utter.onstart = () => showSubtitle(text, Math.min(6, text.length/10 + 2));
+      utter.onend = () => { currentUtterance = null; };
+      currentUtterance = utter;
+      synth.speak(utter);
+    }
+    
+    // ---------- ИГРОВЫЕ ПАРАМЕТРЫ ----------
+    let health = 100;
+    let capsules = 0;
+    const TOTAL_CAPSULES = 5;
+    let ship = null;
+    let asteroids = [];
+    let capsuleItems = [];
+    let bonuses = [];
+    let gamePhase = 'normal';
+    let boostTimer = 0;
+    let escapeTimer = 0;
+    let earthGroup = null;
+    let grassSprites = [];
+    let achievements = {
+      firstCapsule: false, allCapsules: false, noDamage: false, survivedAsteroidBelt: false,
+      speedDemon: false, shieldMaster: false, slowMo: false, earthReached: false
+    };
+    let startTime = 0;
+    let slowMotion = false;
+    let shieldActive = false;
+    let speedBoost = false;
+    
+    let input = { left: false, right: false, up: false, down: false };
+    let shipVelocity = new THREE.Vector3(0, 0, 0);
+    let MAX_SPEED = 10;
+    let SHIP_ACC = 16;
+    const SHIP_FRICTION = 0.96;
+    const ESCAPE_SPEED = 22;
+    const BOUNDS = 15;
+    
+    function setDifficulty(level) {
+      difficulty = level;
+      if (level === 'easy') { MAX_SPEED = 12; SHIP_ACC = 20; }
+      else if (level === 'hard') { MAX_SPEED = 8; SHIP_ACC = 14; }
+      else { MAX_SPEED = 10; SHIP_ACC = 16; }
+    }
+    
+    function updateUI() {
+      document.getElementById('healthValue').innerHTML = Math.max(0, health);
+      document.getElementById('healthFill').style.width = (health/100)*100 + '%';
+      document.getElementById('capsules').innerHTML = capsules;
+      let bonusStr = '';
+      if (shieldActive) bonusStr += '🛡️ ';
+      if (speedBoost) bonusStr += '⚡ ';
+      if (slowMotion) bonusStr += '🐢 ';
+      document.getElementById('bonusStatus').innerHTML = bonusStr || '-';
+    }
+    
+    function updateAchievementsUI() {
+      const list = [];
+      if (achievements.firstCapsule) list.push('Первая капсула');
+      if (achievements.allCapsules) list.push('Все капсулы');
+      if (achievements.noDamage) list.push('Без урона');
+      if (achievements.survivedAsteroidBelt) list.push('Выжил в поясе');
+      if (achievements.speedDemon) list.push('Скоростной демон');
+      if (achievements.shieldMaster) list.push('Мастер щита');
+      if (achievements.slowMo) list.push('Замедление');
+      if (achievements.earthReached) list.push('Достиг Земли');
+      document.getElementById('achList').innerHTML = list.join('<br>') || '—';
+    }
+    
+    // ---------- ВЫСОКОДЕТАЛИЗИРОВАННЫЕ ТЕКСТУРЫ ----------
+    function createAsteroidTexture() {
+      const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#8a7a6a';
+      ctx.fillRect(0,0,2048,2048);
+      for(let i=0;i<8000;i++){
+        ctx.fillStyle = `rgba(70,55,45,${Math.random()*0.8})`;
+        ctx.fillRect(Math.random()*2048, Math.random()*2048, 5+Math.random()*20, 5+Math.random()*20);
+      }
+      for(let i=0;i<1500;i++){
+        ctx.strokeStyle = `rgba(50,40,30,${Math.random()*0.8})`;
+        ctx.beginPath();
+        ctx.moveTo(Math.random()*2048, Math.random()*2048);
+        ctx.lineTo(Math.random()*2048, Math.random()*2048);
+        ctx.stroke();
+      }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+    const astMat = new THREE.MeshStandardMaterial({ map: createAsteroidTexture(), roughness: 0.6, metalness: 0.15 });
+    
+    function createAsteroid(type='normal') {
+      const geom = new THREE.DodecahedronGeometry(0.7);
+      const ast = new THREE.Mesh(geom, astMat);
+      let scale = 0.7 + Math.random() * 1.0;
+      if (type === 'small') scale *= 0.6;
+      if (type === 'large') scale *= 1.4;
+      ast.scale.set(scale, scale, scale);
+      ast.castShadow = true;
+      return ast;
+    }
+    
+    function createCapsule() {
+      const group = new THREE.Group();
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffcc44, metalness: 0.9, emissive: 0x552200, emissiveIntensity: 0.4 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.68, 48), bodyMat);
+      group.add(body);
+      const topMat = new THREE.MeshStandardMaterial({ color: 0xffaa33, emissive: 0x662200, metalness: 0.8 });
+      const top = new THREE.Mesh(new THREE.SphereGeometry(0.3, 48, 48), topMat);
+      top.position.y = 0.4;
+      group.add(top);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.05, 32, 96), new THREE.MeshStandardMaterial({ color: 0xffaa66, metalness: 0.95 }));
+      ring.rotation.x = Math.PI/2;
+      ring.position.y = 0.12;
+      group.add(ring);
+      return group;
+    }
+    
+    function createShip() {
+      const group = new THREE.Group();
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x44aaff, metalness: 0.85, roughness: 0.2, emissive: 0x004466 });
+      const body = new THREE.Mesh(new THREE.ConeGeometry(0.82, 1.6, 48), bodyMat);
+      body.rotation.x = Math.PI / 2;
+      group.add(body);
+      const wingMat = new THREE.MeshStandardMaterial({ color: 0x88ccff, metalness: 0.7 });
+      const wingL = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.15, 0.42), wingMat);
+      wingL.position.set(-1.05, 0, 0);
+      group.add(wingL);
+      const wingR = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.15, 0.42), wingMat);
+      wingR.position.set(1.05, 0, 0);
+      group.add(wingR);
+      const engine = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.54, 0.85, 32), new THREE.MeshStandardMaterial({ color: 0xffaa44, emissive: 0x442200 }));
+      engine.position.set(0, 0, -1.15);
+      group.add(engine);
+      const exhaust = new THREE.PointLight(0xff6600, 0.9, 14);
+      exhaust.position.set(0, 0, -1.4);
+      group.add(exhaust);
+      group.userData = { exhaust };
+      return group;
+    }
+    
+    function createEarth() {
+      const group = new THREE.Group();
+      const canvas = document.createElement('canvas'); canvas.width = 4096; canvas.height = 2048;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#2a6f8f';
+      ctx.fillRect(0,0,4096,2048);
+      ctx.fillStyle = '#4caf50';
+      for(let i=0;i<600;i++){
+        ctx.beginPath();
+        ctx.ellipse(Math.random()*4096, Math.random()*2048, 40+Math.random()*150, 30+Math.random()*120, 0, 0, 2*Math.PI);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#2e7d32';
+      for(let i=0;i<1000;i++){
+        ctx.beginPath();
+        ctx.ellipse(Math.random()*4096, Math.random()*2048, 10+Math.random()*50, 8+Math.random()*40, 0, 0, 2*Math.PI);
+        ctx.fill();
+      }
+      const earthTex = new THREE.CanvasTexture(canvas);
+      const planet = new THREE.Mesh(new THREE.SphereGeometry(4.0, 512, 512), new THREE.MeshStandardMaterial({ map: earthTex, roughness: 0.4, metalness: 0.1 }));
+      group.add(planet);
+      const clouds = new THREE.Mesh(new THREE.SphereGeometry(4.1, 512, 512), new THREE.MeshStandardMaterial({ color: 0xaaccff, transparent: true, opacity: 0.3 }));
+      group.add(clouds);
+      // Зелень – спрайты травы
+      const grassTex = (()=>{
+        const c=document.createElement('canvas'); c.width=128;c.height=128;
+        const ct=c.getContext('2d'); ct.fillStyle='#4caf50'; ct.fillRect(0,0,128,128);
+        ct.fillStyle='#2e7d32'; ct.fillRect(40,80,48,30);
+        ct.fillStyle='#8bc34a'; ct.beginPath(); ct.moveTo(64,20); ct.lineTo(90,50); ct.lineTo(38,50); ct.fill();
+        return new THREE.CanvasTexture(c);
+      })();
+      const grassMat = new THREE.SpriteMaterial({ map: grassTex, transparent: true });
+      for(let i=0;i<2500;i++){
+        const sprite = new THREE.Sprite(grassMat);
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r = 4.12;
+        sprite.position.set(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+        const sc = 0.08 + Math.random()*0.05;
+        sprite.scale.set(sc, sc, 1);
+        group.add(sprite);
+        grassSprites.push(sprite);
+      }
+      group.position.set(0, 0, -120);
+      return group;
+    }
+    
+    // Звёзды
+    const starGeo = new THREE.BufferGeometry();
+    const starPos = new Float32Array(8000 * 3);
+    for(let i=0;i<8000;i++){
+      starPos[i*3] = (Math.random()-0.5)*700;
+      starPos[i*3+1] = (Math.random()-0.5)*400;
+      starPos[i*3+2] = (Math.random()-0.5)*300 - 100;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos,3));
+    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.12 }));
+    scene.add(stars);
+    
+    // Освещение
+    const ambient = new THREE.AmbientLight(0x332c44, 0.7);
+    scene.add(ambient);
+    const sunLight = new THREE.DirectionalLight(0xffdd99, 1.4);
+    sunLight.position.set(12, 22, 8);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 4096;
+    sunLight.shadow.mapSize.height = 4096;
+    scene.add(sunLight);
+    const backLight = new THREE.PointLight(0x8866aa, 0.5);
+    backLight.position.set(0, 5, -20);
+    scene.add(backLight);
+    
+    // Генерация объектов
+    function spawnAsteroid(posX=null, posZ=null, dir=null, spd=null) {
+      if (!gameActive && gamePhase !== 'escape') return;
+      const types = ['normal', 'small', 'large'];
+      const type = types[Math.floor(Math.random()*3)];
+      const ast = createAsteroid(type);
+      let x, z;
+      if (posX !== null && posZ !== null) { x = posX; z = posZ; }
+      else {
+        const side = Math.floor(Math.random()*4);
+        if (side===0) { x = (Math.random()-0.5)*BOUNDS*2; z = -BOUNDS-10; }
+        else if (side===1) { x = (Math.random()-0.5)*BOUNDS*2; z = BOUNDS+10; }
+        else if (side===2) { x = -BOUNDS-10; z = (Math.random()-0.5)*BOUNDS*2; }
+        else { x = BOUNDS+10; z = (Math.random()-0.5)*BOUNDS*2; }
+      }
+      ast.position.set(x, 0, z);
+      let direction;
+      if (dir) direction = dir.clone().normalize();
+      else direction = new THREE.Vector3(-x, 0, -z).normalize();
+      const speed = spd !== undefined ? spd : (2.5 + Math.random()*3.2);
+      ast.userData = { velocity: direction.multiplyScalar(speed), type };
+      scene.add(ast);
+      asteroids.push(ast);
+    }
+    
+    function spawnCapsules() {
+      for(let i=0;i<TOTAL_CAPSULES;i++){
+        const cap = createCapsule();
+        let x,z;
+        do { x = (Math.random()-0.5)*BOUNDS*1.8; z = (Math.random()-0.5)*BOUNDS*1.8; } while(Math.abs(x)<2.8 && Math.abs(z)<2.8);
+        cap.position.set(x, 0.25, z);
+        scene.add(cap);
+        capsuleItems.push(cap);
+      }
+    }
+    
+    function spawnBonus(pos) {
+      const types = ['shield', 'speed', 'slowmo'];
+      const type = types[Math.floor(Math.random()*3)];
+      const group = new THREE.Group();
+      const color = type==='shield' ? 0x88aaff : (type==='speed' ? 0xffaa88 : 0xff88ff);
+      const sphere = new THREE.Mesh(new THREE.SphereGeometry(0.4, 24,24), new THREE.MeshStandardMaterial({ color, emissive: 0x442200 }));
+      group.add(sphere);
+      group.position.copy(pos);
+      group.userData = { type, collected:false };
+      scene.add(group);
+      bonuses.push(group);
+    }
+    
+    function addExplosion(pos) {
+      const geom = new THREE.SphereGeometry(0.5, 12,12);
+      const mat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff3300 });
+      const expl = new THREE.Mesh(geom, mat);
+      expl.position.copy(pos);
+      scene.add(expl);
+      setTimeout(()=>scene.remove(expl), 300);
+    }
+    
+    function takeDamage(amount) {
+      if (gamePhase !== 'normal') return;
+      if (shieldActive) { shieldActive = false; speakAlice("Щит поглотил урон!"); return; }
+      health -= amount;
+      if (health < 0) health = 0;
+      updateUI();
+      playTone(110, 0.35, 0.13);
+      speakAlice(`Корабль повреждён! Осталось ${health} HP.`);
+      if (health <= 0) {
+        gameActive = false;
+        speakAlice("Корабль уничтожен... Игра окончена.");
+        const msgDiv = document.getElementById('message');
+        msgDiv.style.display = 'block';
+        msgDiv.innerHTML = '💥 ВЫ РАЗБИЛИСЬ 💥<br>ПЕРЕЗАГРУЗКА...';
+        msgDiv.style.color = '#ff8888';
+        stopMusic();
+        setTimeout(() => location.reload(), 5000);
+      } else {
+        const push = shipVelocity.clone().normalize().multiplyScalar(3.5);
+        shipVelocity.copy(push);
+      }
+    }
+    
+    function collectCapsule(index) {
+      const cap = capsuleItems[index];
+      scene.remove(cap);
+      capsuleItems.splice(index,1);
+      capsules++;
+      updateUI();
+      playTone(800, 0.24, 0.13);
+      speakAlice(`Капсула найдена! Осталось ${TOTAL_CAPSULES - capsules}.`);
+      if (!achievements.firstCapsule) { achievements.firstCapsule = true; updateAchievementsUI(); }
+      if (capsules === TOTAL_CAPSULES && gamePhase === 'normal') {
+        gamePhase = 'boost';
+        boostTimer = 2.8;
+        speakAlice("Капсулы собраны! Активирую форсаж! Держись!");
+        if (!achievements.allCapsules) { achievements.allCapsules = true; updateAchievementsUI(); }
+        if (health === 100 && !achievements.noDamage) { achievements.noDamage = true; updateAchievementsUI(); }
+        if (ship.userData.exhaust) ship.userData.exhaust.intensity = 2.0;
+      }
+    }
+    
+    let boostParticles = null;
+    function updateBoostMode(delta) {
+      boostTimer -= delta;
+      if (!boostParticles) {
+        const geom = new THREE.BufferGeometry();
+        const positions = [];
+        for(let i=0;i<150;i++) positions.push((Math.random()-0.5)*1.8, (Math.random()-0.5)*1.8, -2.2 - Math.random()*2.5);
+        geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+        boostParticles = new THREE.Points(geom, new THREE.PointsMaterial({ color: 0xff8844, size: 0.16 }));
+        ship.add(boostParticles);
+      }
+      if (ship.userData.exhaust) ship.userData.exhaust.intensity = 2.3 + Math.random()*0.7;
+      shipVelocity.z = -MAX_SPEED * 1.7;
+      ship.position.z += shipVelocity.z * delta;
+      if (boostTimer <= 0) {
+        gamePhase = 'escape';
+        escapeTimer = 0;
+        speakAlice("Внимание! Астероидный пояс! Уклоняйтесь 40 секунд!");
+        if (boostParticles) ship.remove(boostParticles);
+        if (ship.userData.exhaust) ship.userData.exhaust.intensity = 0.9;
+        for(let a of asteroids) scene.remove(a);
+        asteroids = [];
+        for(let i=0;i<250;i++){
+          const x = (Math.random()-0.5)*BOUNDS*2.4;
+          const z = -40 - Math.random() * 250;
+          spawnAsteroid(x, z, new THREE.Vector3(0,0,1), 13 + Math.random()*5);
+        }
+      }
+      updateCamera();
+    }
+    
+    function updateEscapeMode(delta) {
+      shipVelocity.z = -ESCAPE_SPEED;
+      ship.position.z += shipVelocity.z * delta;
+      let acc = 0;
+      if (input.left) acc = SHIP_ACC * 1.7;
+      if (input.right) acc = -SHIP_ACC * 1.7;
+      shipVelocity.x += acc * delta;
+      shipVelocity.x *= 0.98;
+      shipVelocity.x = Math.min(15, Math.max(-15, shipVelocity.x));
+      ship.position.x += shipVelocity.x * delta;
+      ship.position.x = Math.max(-BOUNDS, Math.min(BOUNDS, ship.position.x));
+      ship.rotation.z = shipVelocity.x * 0.09;
+      for(let i=0;i<asteroids.length;i++){
+        const ast = asteroids[i];
+        ast.position.z += ast.userData.velocity.z * delta;
+        if (ship.position.distanceTo(ast.position) < 1.0) {
+          addExplosion(ast.position);
+          scene.remove(ast);
+          asteroids.splice(i,1);
+          i--;
+          takeDamage(10);
+          if (!gameActive) return;
+        }
+        if (ast.position.z > ship.position.z + 30) {
+          scene.remove(ast);
+          asteroids.splice(i,1);
+          i--;
+        }
+      }
+      if (Math.random() < 0.12 && asteroids.length < 160) {
+        const x = (Math.random()-0.5)*BOUNDS*2.2;
+        const z = ship.position.z - 55;
+        spawnAsteroid(x, z, new THREE.Vector3(0,0,1), 15 + Math.random()*6);
+      }
+      escapeTimer += delta;
+      if (escapeTimer > 40.0) {
+        gamePhase = 'ending';
+        if (!achievements.survivedAsteroidBelt) { achievements.survivedAsteroidBelt = true; updateAchievementsUI(); }
+        startEnding();
+      }
+      updateCamera();
+    }
+    
+    function startEnding() {
+      if (!earthGroup) { earthGroup = createEarth(); scene.add(earthGroup); }
+      earthGroup.position.set(0, 0, -120);
+      speakAlice("Прорыв успешен! Приближаемся к Земле!");
+      let endingTime = 0;
+      const duration = 6.0;
+      function endingAnimate() {
+        if (!gameActive) return;
+        endingTime += 1/60;
+        const t = endingTime / duration;
+        if (t < 1) {
+          earthGroup.position.z = -120 + t * 115;
+          grassSprites.forEach(sprite => {
+            const angle = Date.now() * 0.005;
+            sprite.scale.y = (0.08 + Math.sin(angle)*0.02);
+          });
+          const targetCamZ = -9 + t * 7;
+          const targetCamY = 3.5 - t * 1.2;
+          camera.position.z += (targetCamZ - camera.position.z) * 0.1;
+          camera.position.y += (targetCamY - camera.position.y) * 0.1;
+          camera.lookAt(ship.position);
+        } else {
+          gameActive = false;
+          achievements.earthReached = true;
+          updateAchievementsUI();
+          speakAlice("Поздравляю! Вы доставили капсулы на Землю! Миссия выполнена!");
+          const msgDiv = document.getElementById('message');
+          msgDiv.style.display = 'block';
+          msgDiv.innerHTML = '🏆 ПОБЕДА! 🏆<br>ВЫ СПАСЛИ ГАЛАКТИКУ!';
+          msgDiv.style.color = '#aaffaa';
+          stopMusic();
+          setTimeout(() => location.reload(), 7000);
+          cancelAnimationFrame(endingFrame);
+        }
+        renderer.render(scene, camera);
+        if (gameActive) endingFrame = requestAnimationFrame(endingAnimate);
+      }
+      let endingFrame = requestAnimationFrame(endingAnimate);
+    }
+    
+    function updateCamera() {
+      if (!ship) return;
+      if (gamePhase === 'escape') {
+        const offset = new THREE.Vector3(ship.position.x * 0.3, 2.6, ship.position.z - 10);
+        camera.position.lerp(offset, 0.22);
+        camera.lookAt(ship.position);
+      } else if (cameraMode === 0) {
+        const offset = new THREE.Vector3(0, 3.4, -8.5);
+        camera.position.lerp(ship.position.clone().add(offset), 0.22);
+        camera.lookAt(ship.position);
+      } else if (cameraMode === 1) {
+        const offset = new THREE.Vector3(0, 13, -1.5);
+        camera.position.lerp(ship.position.clone().add(offset), 0.2);
+        camera.lookAt(ship.position);
+      } else {
+        camera.position.lerp(ship.position, 0.12);
+        camera.rotation.copy(ship.rotation);
+      }
+    }
+    
+    let lastFrame = performance.now();
+    function updateNormal(delta) {
+      let acc = new THREE.Vector3(0,0,0);
+      if (input.left) acc.x = SHIP_ACC;
+      if (input.right) acc.x = -SHIP_ACC;
+      if (input.up) acc.z = SHIP_ACC;
+      if (input.down) acc.z = -SHIP_ACC;
+      shipVelocity.x += acc.x * delta;
+      shipVelocity.z += acc.z * delta;
+      shipVelocity.x *= SHIP_FRICTION;
+      shipVelocity.z *= SHIP_FRICTION;
+      if (shipVelocity.length() > MAX_SPEED) shipVelocity.multiplyScalar(MAX_SPEED / shipVelocity.length());
+      ship.position.x += shipVelocity.x * delta;
+      ship.position.z += shipVelocity.z * delta;
+      ship.position.x = Math.max(-BOUNDS, Math.min(BOUNDS, ship.position.x));
+      ship.position.z = Math.max(-BOUNDS, Math.min(BOUNDS, ship.position.z));
+      ship.rotation.z = shipVelocity.x * 0.13;
+      if (ship.userData.exhaust) {
+        const intensity = Math.min(1.0, shipVelocity.length() / 7);
+        ship.userData.exhaust.intensity = 0.45 + intensity;
+      }
+      for(let i=0;i<asteroids.length;i++){
+        const ast = asteroids[i];
+        ast.position.x += ast.userData.velocity.x * delta;
+        ast.position.z += ast.userData.velocity.z * delta;
+        if (Math.abs(ast.position.x) > BOUNDS+10 || Math.abs(ast.position.z) > BOUNDS+10) {
+          scene.remove(ast);
+          asteroids.splice(i,1);
+          i--;
+          continue;
+        }
+        if (ship.position.distanceTo(ast.position) < 1.0) {
+          addExplosion(ast.position);
+          scene.remove(ast);
+          asteroids.splice(i,1);
+          i--;
+          takeDamage(10);
+          if (!gameActive) return;
+        }
+      }
+      for(let i=0;i<capsuleItems.length;i++){
+        if (ship.position.distanceTo(capsuleItems[i].position) < 1.0) {
+          collectCapsule(i);
+          break;
+        }
+      }
+      for(let i=0;i<bonuses.length;i++){
+        const b = bonuses[i];
+        if (!b.userData.collected && ship.position.distanceTo(b.position) < 1.1) {
+          b.userData.collected = true;
+          scene.remove(b);
+          bonuses.splice(i,1);
+          if (b.userData.type === 'shield') { shieldActive = true; speakAlice("Щит активирован!"); setTimeout(()=>{ shieldActive = false; }, 12000); if(!achievements.shieldMaster) { achievements.shieldMaster=true; updateAchievementsUI(); } }
+          if (b.userData.type === 'speed') { speedBoost = true; MAX_SPEED *= 1.5; speakAlice("Ускорение!"); setTimeout(()=>{ speedBoost = false; MAX_SPEED /= 1.5; }, 10000); if(!achievements.speedDemon) { achievements.speedDemon=true; updateAchievementsUI(); } }
+          if (b.userData.type === 'slowmo') { slowMotion = true; speakAlice("Замедление времени!"); setTimeout(()=>{ slowMotion = false; }, 6000); if(!achievements.slowMo) { achievements.slowMo=true; updateAchievementsUI(); } }
+          break;
+        }
+      }
+      if (asteroids.length < 14 && Math.random() < 0.022) spawnAsteroid();
+      if (Math.random() < 0.006) spawnBonus(ship.position.clone().add(new THREE.Vector3((Math.random()-0.5)*6, 0, (Math.random()-0.5)*6)));
+      updateCamera();
+    }
+    
+    function updateGame() {
+      if (!gameActive) return;
+      const now = performance.now();
+      let delta = Math.min(0.033, (now - lastFrame) / 1000);
+      if (slowMotion) delta *= 0.5;
+      lastFrame = now;
+      if (gamePhase === 'boost') updateBoostMode(delta);
+      else if (gamePhase === 'escape') updateEscapeMode(delta);
+      else if (gamePhase === 'normal') updateNormal(delta);
+      stars.rotation.y += 0.0003;
+    }
+    
+    function toggleCamera() {
+      if (gamePhase !== 'normal') return;
+      cameraMode = (cameraMode + 1) % 3;
+      const hint = document.getElementById('cameraHint');
+      if (cameraMode===0) hint.innerText = "🎥 Камера: вид сзади";
+      else if (cameraMode===1) hint.innerText = "🎥 Камера: вид сверху";
+      else hint.innerText = "🎥 Камера: вид из кабины";
+    }
+    
+    // ---------- СТАРТ ИГРЫ ----------
+    function startGame() {
+      gameActive = true;
+      gamePhase = 'normal';
+      health = 100;
+      capsules = 0;
+      shieldActive = false;
+      speedBoost = false;
+      slowMotion = false;
+      shipVelocity.set(0,0,0);
+      achievements = { firstCapsule: false, allCapsules: false, noDamage: false, survivedAsteroidBelt: false,
+        speedDemon: false, shieldMaster: false, slowMo: false, earthReached: false };
+      updateUI();
+      updateAchievementsUI();
+      document.getElementById('mainMenu').classList.add('hidden');
+      document.getElementById('info').classList.remove('hidden');
+      document.getElementById('controlsHint').classList.remove('hidden');
+      document.getElementById('cameraHint').classList.remove('hidden');
+      document.getElementById('musicToggle').classList.remove('hidden');
+      document.getElementById('achievementsPanel').classList.remove('hidden');
+      
+      // Очистка старого мира
+      if (ship) scene.remove(ship);
+      for(let a of asteroids) scene.remove(a);
+      for(let c of capsuleItems) scene.remove(c);
+      for(let b of bonuses) scene.remove(b);
+      asteroids = [];
+      capsuleItems = [];
+      bonuses = [];
+      if (earthGroup) scene.remove(earthGroup);
+      grassSprites = [];
+      
+      ship = createShip();
+      ship.position.set(0,0,0);
+      scene.add(ship);
+      spawnCapsules();
+      for(let i=0;i<14;i++) spawnAsteroid();
+      camera.position.set(0,3.4,-8.5);
+      cameraMode = 0;
+      startTime = performance.now();
+      startMusic();
+      setTimeout(()=>speakAlice("Привет! Я Алиса. Собери 5 жёлтых капсул, уклоняясь от астероидов. Нажми C для смены камеры."), 500);
+      
+      controls.lock();
+      const onUnlock = () => {
+        if (gameActive && !controls.isLocked) {
+          document.getElementById('relockScreen').classList.remove('hidden');
+        }
+      };
+      controls.domElement.ownerDocument.addEventListener('pointerlockchange', onUnlock);
+      document.getElementById('relockScreen').onclick = () => {
+        if (gameActive && !controls.isLocked) {
+          controls.lock();
+          document.getElementById('relockScreen').classList.add('hidden');
+        }
+      };
+    }
+    
+    // ---------- МЕНЮ ----------
+    document.querySelectorAll('.difficulty').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.difficulty').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        setDifficulty(btn.dataset.diff);
+      });
+    });
+    document.getElementById('startBtn').addEventListener('click', startGame);
+    document.getElementById('exitBtn').addEventListener('click', () => {
+      if (confirm('Выйти из игры?')) window.close();
+    });
+    document.getElementById('musicToggle').addEventListener('click', () => {
+      musicOn = !musicOn;
+      document.getElementById('musicToggle').innerText = musicOn ? "🎵 МУЗЫКА: ВКЛ" : "🎵 МУЗЫКА: ВЫКЛ";
+      if (!musicOn && musicInterval) clearInterval(musicInterval);
+      else if (musicOn && gameActive) startMusic();
+    });
+    
+    function handleKeyDown(e) {
+      const key = e.key;
+      if (key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight' ||
+          key === 'w' || key === 'W' || key === 's' || key === 'S' || key === 'a' || key === 'A' || key === 'd' || key === 'D' ||
+          key === 'c' || key === 'C') {
+        e.preventDefault();
+      }
+      if (gameActive && controls.isLocked) {
+        if (key === 'ArrowUp' || key === 'w' || key === 'W') input.up = true;
+        if (key === 'ArrowDown' || key === 's' || key === 'S') input.down = true;
+        if (key === 'ArrowLeft' || key === 'a' || key === 'A') input.left = true;
+        if (key === 'ArrowRight' || key === 'd' || key === 'D') input.right = true;
+        if (key === 'c' || key === 'C') toggleCamera();
+      }
+    }
+    function handleKeyUp(e) {
+      const key = e.key;
+      if (gameActive && controls.isLocked) {
+        if (key === 'ArrowUp' || key === 'w' || key === 'W') input.up = false;
+        if (key === 'ArrowDown' || key === 's' || key === 'S') input.down = false;
+        if (key === 'ArrowLeft' || key === 'a' || key === 'A') input.left = false;
+        if (key === 'ArrowRight' || key === 'd' || key === 'D') input.right = false;
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
+    function animate() {
+      requestAnimationFrame(animate);
+      if (gameActive) updateGame();
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
